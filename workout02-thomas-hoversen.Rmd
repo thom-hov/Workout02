@@ -1,0 +1,203 @@
+---
+title: "workout02-thomas-hoversen.Rmd"
+author: "Thomas Hoversen"
+date: "4/15/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+```{bash}
+pwd
+```
+
+```{r}
+#' @title Future Value.
+#' @description Computes the future value of an investment.
+#' @param amount Initial invested amount (numeric). 
+#' @param rate Annual rate of return (numeric). 
+#' @param years Number of years (numeric). 
+#' @return The future value of an investment.
+
+future_value <- function(amount, rate, years) {
+  future_value <- amount * (1 + rate)^years
+  return(future_value)
+}
+
+#' @title Future Value of Annuity.
+#' @description Computes the future value of annuity.
+#' @param contrib Contributed amount (numeric). 
+#' @param rate Annual rate of return (numeric). 
+#' @param years Number of years (numeric). 
+#' @return The future value of annuity
+
+annuity <- function(contrib, rate, years) {
+  annuity <- contrib * (((1 + rate)^years - 1) / rate)
+  return(annuity)
+}
+
+#' @title Future Value of Growing Annuity.
+#' @description Computes the future value of a growing annuity.
+#' @param contrib Contributed amount (numeric). 
+#' @param rate Annual rate of return (numeric). 
+#' @param growth Annual Growth rate (numeric). 
+#' @param years Number of years (numeric). 
+#' @return The future value of a growing annuity.
+
+growing_annuity <- function(contrib, rate, growth, years) {
+  growing_annuity <- contrib * (((1 + rate)^years - (1 + growth)^years) / (rate - growth))
+  return(growing_annuity)
+}
+```
+
+```{r}
+
+library(shiny)
+library(ggplot2)
+
+ui <- fluidPage(
+  
+  titlePanel(title = "Here is the Title"),
+  
+  column(4,
+      sliderInput(inputId = "amount",
+                  label = "Initial Amount",
+                  min = 0, max = 100000,
+                  step = 500,
+                  value = 1000),
+      
+      sliderInput(inputId = "contrib",
+                  label = "Annual Contribution",
+                  min = 0, max = 50000,
+                  step = 500,
+                  value = 2000)
+
+),
+column(4,
+
+      sliderInput(inputId = "rate",
+                  label = "Return Rate (in %)",
+                  step = 0.1,
+                  min = 0, max = 20,
+                  value = 5),
+
+
+      sliderInput(inputId = "growth",
+                  label = "Growth Rate (in %)",
+                  step = 0.1,
+                  min = 0, max = 20,
+                  value = 2)
+  ),
+column(4,
+
+      sliderInput(inputId = "years",
+                  label = "Years",
+                  step = 1,
+                  min = 0, max = 50,
+                  value = 20),
+      
+      selectInput(inputId = "facet",
+                  label = "Facet?", 
+                  choices = c("Yes", "No"))
+# Include facet option
+   ),
+
+plotOutput("graphofdata"),
+br(),
+br(),
+tableOutput("TheTable")
+
+
+)
+
+
+
+
+server <- function(input, output) {
+
+  #Making inputs reactive for the functions and loops.
+  amount. <- reactive({as.numeric(input$amount)})  
+  rate. <- reactive({as.numeric(input$rate)})
+  years. <- reactive({as.numeric(input$years)})
+  growth. <- reactive({as.numeric(input$growth)})
+  contrib. <- reactive({as.numeric(input$contrib)})
+
+  #Loop 1
+  no_contrib <- reactive({ 
+    no_contrib <- rep(amount.(), years.())
+    for (i in 1:(years.()-1)) {
+      no_contrib[i+1] <- future_value(amount = amount.(), rate = rate.()/100, years = i)
+    }
+    no_contrib
+  })
+
+  #Loop 2
+  version1 <- reactive({rep(0:years.())})
+  version2 <- reactive({rep(0:years.())})
+
+    
+  fixed_contrib <- reactive({ 
+      v1 = version1()
+      v2 = version2()
+    fixed_contrib <- rep(amount.(), years.())
+    for (i in 1:(years.()-1)) {
+      v1[i] <- annuity(contrib = contrib.(), rate = rate.()/ 100, years = i)
+      v2[i] <- future_value(amount = amount.(), rate = rate.()/ 100, years = i)
+      fixed_contrib[i+1] <- v1[i] + v2[i]
+    }
+    fixed_contrib
+  })
+  
+
+  #Loop 3
+  version3 <- reactive({rep(0:years.())})
+  version4 <- reactive({rep(0:years.())})
+
+  growing_contrib <- reactive({ 
+      v3 = version3()
+      v4 = version4()
+    growing_contrib <- rep(amount.(), years.())
+    
+    for (i in 1:(years.()-1)) {
+      v3[i] <- growing_annuity(contrib = contrib.(), rate = rate.()/ 100, growth = growth.()/ 100, years = i)
+      v4[i] <- future_value(amount = amount.(), rate = rate.()/ 100, years = i)
+      growing_contrib[i+1] <- v3[i] + v4[i]
+    }
+    growing_contrib
+  })
+  
+  objectobject <-reactive({
+    data.frame(1:years.(), no_contrib(), fixed_contrib(), growing_contrib())})
+  
+  output$graphofdata <- renderPlot({
+    df=objectobject()
+    yr=years.()
+    #if facet is yes do this if no do that.
+    ggplot(df, aes(x= 1:yr)) +
+    geom_line(aes(y = df[[2]], colour="blue")) +
+    geom_line(aes(y = df[[3]], colour="red")) +
+    geom_line(aes(y = df[[4]], colour="orange")) +
+    labs(x = "Years", y = "Amount (in dollars)", title = "The Three Savings Modalities") + 
+    theme_dark()
+  })
+  
+  output$TheTable <- renderTable({
+    df = objectobject()
+    df
+  })
+  
+
+}
+
+shinyApp(ui = ui, server = server)
+```
+
+
+
+
+
+
+
